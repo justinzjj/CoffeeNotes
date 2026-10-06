@@ -50,6 +50,31 @@ static void audit(lv_obj_t *parent)
         audit(obj);
     }
 }
+static lv_obj_t *find_label(lv_obj_t *parent, const char *value)
+{
+    for (uint32_t i = 0; i < lv_obj_get_child_count(parent); ++i) {
+        lv_obj_t *child = lv_obj_get_child(parent, (int32_t)i);
+        if (lv_obj_check_type(child, &lv_label_class) && !strcmp(lv_label_get_text(child), value)) return child;
+        lv_obj_t *found = find_label(child, value);
+        if (found) return found;
+    }
+    return NULL;
+}
+static void audit_heatmap(void)
+{
+    /* Fixture: day 4=zero, day 1=one, day 2=two, day 3/6=three cups. */
+    const char *days[] = {"4","1","2","3"};
+    lv_color_t levels[4];
+    for (unsigned i = 0; i < 4; ++i) {
+        lv_obj_t *cell = find_label(lv_screen_active(), days[i]); assert(cell);
+        levels[i] = lv_obj_get_style_bg_color(cell, LV_PART_MAIN);
+        for (unsigned j = 0; j < i; ++j) assert(!lv_color_eq(levels[i], levels[j]));
+    }
+    lv_obj_t *selected = find_label(lv_screen_active(), "6"); assert(selected);
+    assert(lv_obj_get_style_outline_width(selected, LV_PART_MAIN) == 2);
+    assert(lv_color_eq(lv_obj_get_style_bg_color(selected, LV_PART_MAIN), levels[3]));
+    assert(!find_label(lv_screen_active(), "6."));
+}
 static bool inside_corner(int x, int y)
 {
     int cx = x < 30 ? 30 : x >= 210 ? 209 : x;
@@ -95,6 +120,7 @@ int main(void)
     model.day_focus = 7; render("day-scrolled",&model,&info,0);
     model.page = COFFEE_RECORD; model.recipe = 0; model.type = 0; model.draft_date = 20261006; model.draft_minute = 1439; model.draft_clock_valid = true; model.record_seconds = 150;
     render("record",&model,&info,0);
+    assert(!find_label(lv_screen_active(), "已校时 可直接保存"));
     for (unsigned i = 0; i < COFFEE_TYPE_COUNT; ++i) { model.type = (uint8_t)i; render(NULL,&model,&info,0); }
     model.page = COFFEE_RECIPES; model.focus = 1; render("recipes",&model,&info,0);
     for (unsigned i = 0; i < 3; ++i) { model.page = COFFEE_RECIPE; model.recipe = (uint8_t)i; model.focus = 0; render(i == 0 ? "recipe" : NULL,&model,&info,0); }
@@ -116,6 +142,50 @@ int main(void)
     info.storage_ready = false; render("storage-failure",&model,&info,0);
     info.input_ready = false; render("input-failure",&model,&info,0);
     info.input_ready = info.storage_ready = true; info.battery = -1; model.notice = COFFEE_NOTICE_NONE;
+    const uint32_t sample_dates[] = {20261001,20261002,20261002,20261003,20261003,20261003,
+                                   20261005,20261006,20261006,20261006,20261007,20261007,20260930};
+    data.count = sizeof(sample_dates) / sizeof(sample_dates[0]);
+    for (unsigned i = 0; i < data.count; ++i)
+        data.entries[i] = (coffee_entry_t){sample_dates[i],(uint16_t)(540 + i * 20),0,(uint8_t)(i % COFFEE_TYPE_COUNT),COFFEE_NO_RECIPE,0};
+    const coffee_page_t pages[] = {COFFEE_HOME,COFFEE_CALENDAR,COFFEE_DAY,COFFEE_RECORD,
+        COFFEE_RECIPES,COFFEE_RECIPE,COFFEE_EDIT_RECIPE,COFFEE_TIMER,COFFEE_SETTINGS,
+        COFFEE_DATE,COFFEE_NETWORK,COFFEE_DELETE,COFFEE_FORGET,COFFEE_THEMES};
+    const char *periods[] = {"今日咖啡","本周咖啡","本月咖啡"};
+    char render_file[64];
+    for (unsigned theme = 0; theme < COFFEE_THEME_COUNT; ++theme) {
+        data.theme = (uint8_t)theme; coffee_model_init(&model,&data);
+        coffee_model_clock(&model,20261006,630,true); model.recipe = 0;
+        model.draft_recipe = data.recipes[0]; model.draft_theme = (uint8_t)theme;
+        for (unsigned period = 0; period < COFFEE_PERIOD_COUNT; ++period) {
+            data.home_period = (uint8_t)period; model.page = COFFEE_HOME; model.focus = 4;
+            snprintf(render_file,sizeof(render_file),"theme-%u-home-%u",theme,period);
+            render(render_file,&model,&info,0);
+            assert(find_label(lv_screen_active(), periods[period]));
+        }
+        data.home_period = COFFEE_TODAY; model.page = COFFEE_CALENDAR; model.cursor = 20261006;
+        snprintf(render_file,sizeof(render_file),"theme-%u-calendar",theme);
+        render(render_file,&model,&info,0); audit_heatmap();
+        for (unsigned page = 0; page < sizeof(pages) / sizeof(pages[0]); ++page) {
+            model.page = pages[page]; model.focus = 0; model.day_focus = 0;
+            model.draft_clock_valid = true; model.type = COFFEE_HAND;
+            model.draft_date = 20261006; model.draft_minute = 630;
+            model.timer_active = true; model.timer_paused = false; model.timer_accum = 0; model.timer_anchor = 0;
+            if (model.page == COFFEE_THEMES) snprintf(render_file,sizeof(render_file),"theme-%u-picker",theme);
+            else if (model.page == COFFEE_RECORD) snprintf(render_file,sizeof(render_file),"theme-%u-record",theme);
+            else if (model.page == COFFEE_TIMER) snprintf(render_file,sizeof(render_file),"theme-%u-timer",theme);
+            else render_file[0] = 0;
+            render(render_file[0] ? render_file : NULL,&model,&info,70000);
+        }
+    }
+    data.theme = 0; coffee_model_init(&model,&data); model.page = COFFEE_HOME;
+    render(NULL,&model,&info,0);
+    lv_color_t durable_background = lv_obj_get_style_bg_color(lv_screen_active(), LV_PART_MAIN);
+    model.page = COFFEE_THEMES; model.draft_theme = 3;
+    render(NULL,&model,&info,0);
+    assert(!lv_color_eq(durable_background, lv_obj_get_style_bg_color(lv_screen_active(), LV_PART_MAIN)));
+    coffee_model_key(&model,COFFEE_BACK,0); render(NULL,&model,&info,0);
+    assert(model.page == COFFEE_SETTINGS && data.theme == 0);
+    assert(lv_color_eq(durable_background, lv_obj_get_style_bg_color(lv_screen_active(), LV_PART_MAIN)));
     data.count = COFFEE_CAPACITY;
     for (unsigned i = 0; i < data.count; ++i) data.entries[i] = (coffee_entry_t){20261001 + i % 31, (uint16_t)(i % 1440),0,COFFEE_LATTE,COFFEE_NO_RECIPE,0};
     model.page = COFFEE_CALENDAR; model.cursor = 20261006; render("calendar-full-month",&model,&info,0);
@@ -125,14 +195,17 @@ int main(void)
     lv_mem_monitor_t before,after;
     model.page = COFFEE_HOME; render(NULL,&model,&info,0);
     lv_mem_monitor(&before);
-    for (unsigned i = 0; i < 300; ++i) {
-        model.page = i % 2 ? COFFEE_CALENDAR : COFFEE_HOME; model.cursor = coffee_date_month(20261006,(int)i % 12); model.focus = i % 4;
+    for (unsigned i = 0; i < 1200; ++i) {
+        data.theme = (uint8_t)(i % COFFEE_THEME_COUNT); data.home_period = (uint8_t)(i % COFFEE_PERIOD_COUNT);
+        model.page = i % 3 == 0 ? COFFEE_CALENDAR : i % 3 == 1 ? COFFEE_HOME : COFFEE_THEMES;
+        model.draft_theme = data.theme; model.cursor = coffee_date_month(20261006,(int)i % 12); model.focus = i % 5;
         render(NULL,&model,&info,0);
-        if (i == 99) { model.page = COFFEE_HOME; render(NULL,&model,&info,0); lv_mem_monitor(&before); }
+        if (i == 99) { model.page = COFFEE_HOME; data.theme = data.home_period = 0; model.focus = 0; render(NULL,&model,&info,0); lv_mem_monitor(&before); }
     }
+    data.theme = data.home_period = 0; model.focus = 0;
     model.page = COFFEE_HOME; render(NULL,&model,&info,0); lv_mem_monitor(&after);
     assert(after.free_size >= before.free_size && after.free_biggest_size >= 2048);
-    printf("LVGL 13 pages/states, actual fonts, negative glyph, bounds and 300 transitions: PASS\n");
+    printf("LVGL 14 pages, 4 palettes, 3 periods, intensity/selection, actual fonts, bounds and 1200 transitions: PASS\n");
     printf("LVGL 40 KB pool: free=%lu largest=%lu peak=%lu bytes\n",(unsigned long)after.free_size,(unsigned long)after.free_biggest_size,(unsigned long)after.max_used);
     lv_deinit(); return 0;
 }

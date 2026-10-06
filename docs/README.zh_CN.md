@@ -35,7 +35,8 @@
 
 当前工作区实现 [CoffeeNotes 咖啡手记](apps/coffeenotes.zh_CN.md)：中文咖啡日历、快速饮用
 记录和可调整的手冲参数与计时，支持联网同步北京时间和本地存储。
-参见[实现计划](superpowers/plans/2026-10-06-coffeenotes.zh_CN.md)。
+支持色阶日历、今日/周/月统计及四套配色；参见[实现计划](superpowers/plans/2026-10-06-coffeenotes.zh_CN.md)
+与[界面优化计划](superpowers/plans/2026-10-06-coffeenotes-ui.zh_CN.md)。
 
 <p align="center">
   <img src="../assets/images/home.jpg" alt="FoloToy AI Passport 可穿戴设备的正面、侧面和背面展示。" width="100%">

@@ -71,6 +71,7 @@ static void assert_data_equal(const coffee_data_t *left, const coffee_data_t *ri
 {
     /* The wire format excludes compiler padding in entry structs. */
     assert(left->count == right->count && left->last_date == right->last_date && left->last_minute == right->last_minute);
+    assert(left->home_period == right->home_period && left->theme == right->theme);
     for (unsigned i = 0; i < COFFEE_RECIPE_COUNT; ++i) {
         assert(left->recipes[i].grams == right->recipes[i].grams);
         assert(left->recipes[i].water_ml == right->recipes[i].water_ml);
@@ -88,6 +89,7 @@ static void assert_data_equal(const coffee_data_t *left, const coffee_data_t *ri
 }
 static void populate(void)
 {
+    data.home_period = COFFEE_WEEK; data.theme = COFFEE_THEME_COUNT - 1;
     data.count = 3;
     data.last_date = 20261005;
     data.last_minute = 1234;
@@ -165,7 +167,7 @@ static void full_capacity_roundtrip(void)
 }
 static void corruption_blocks_overwrite(void)
 {
-    for (unsigned corruption = 0; corruption < 8; ++corruption) {
+    for (unsigned corruption = 0; corruption < 10; ++corruption) {
         reset(); seed_blob(); coffee_store_t store = {0};
         if (corruption == 0) fake.blob[44] ^= 1; /* CRC. */
         if (corruption == 1) { fake.blob[56] = COFFEE_TYPE_COUNT; update_crc(); } /* Valid CRC, invalid entry. */
@@ -175,6 +177,8 @@ static void corruption_blocks_overwrite(void)
         if (corruption == 5) fake.length = 47;
         if (corruption == 6) --fake.length;
         if (corruption == 7) ++fake.length;
+        if (corruption == 8) { fake.blob[14] = COFFEE_PERIOD_COUNT; update_crc(); }
+        if (corruption == 9) { fake.blob[15] = COFFEE_THEME_COUNT; update_crc(); }
         assert(coffee_store_init(&store, &data) != ESP_OK);
         assert(!store.ready && store.corrupt);
         assert_unchanged();
@@ -255,6 +259,69 @@ static void invalid_model_has_no_writes(void)
     assert(coffee_store_save(&store, &data) == ESP_ERR_INVALID_ARG);
     assert(store.ready); assert_no_writes();
 }
+static void preferences_roundtrip_preserves_records(void)
+{
+    for (unsigned period = 0; period < COFFEE_PERIOD_COUNT; ++period) {
+        for (unsigned theme = 0; theme < COFFEE_THEME_COUNT; ++theme) {
+            reset(); seed_blob(); coffee_store_t store = {0};
+            assert(coffee_store_init(&store, &data) == ESP_OK);
+            assert_data_equal(&data, &saved); saved = data; /* Normalize excluded struct padding after decode. */
+            coffee_model_t model; coffee_model_init(&model, &data);
+            model.page = COFFEE_THEMES;
+            model.draft_period = (uint8_t)period; model.draft_theme = (uint8_t)theme;
+            assert(coffee_prepare_change(&model, COFFEE_ACTION_PREFERENCES, &expected));
+            assert(coffee_store_save(&store, &expected) == ESP_OK);
+            data = expected;
+            coffee_model_complete(&model, COFFEE_ACTION_PREFERENCES, true);
+            assert(model.page == COFFEE_SETTINGS && model.focus == 2);
+            assert(data.count == saved.count && memcmp(data.entries, saved.entries, sizeof(data.entries)) == 0);
+            coffee_data_init(&data, 20261231); coffee_store_t restarted = {0};
+            assert(coffee_store_init(&restarted, &data) == ESP_OK);
+            assert_data_equal(&data, &expected);
+            assert(fake.set_calls == 1 && fake.commit_calls == 1 && fake.erase_calls == 0);
+        }
+    }
+}
+static void preferences_failure_keeps_durable_state(void)
+{
+    for (unsigned stage = 0; stage < 2; ++stage) {
+        reset(); seed_blob(); coffee_store_t store = {0};
+        assert(coffee_store_init(&store, &data) == ESP_OK);
+        coffee_model_t model; coffee_model_init(&model, &data);
+        model.focus = 4;
+        assert(coffee_model_key(&model, COFFEE_OK, 0) == COFFEE_ACTION_PREFERENCES);
+        expected = data;
+        assert(coffee_prepare_change(&model, COFFEE_ACTION_PREFERENCES, &saved));
+        if (stage == 0) fake.set_error = ESP_FAIL;
+        else fake.commit_error = ESP_FAIL;
+        assert(coffee_store_save(&store, &saved) == ESP_FAIL);
+        coffee_model_complete(&model, COFFEE_ACTION_PREFERENCES, false);
+        assert(model.page == COFFEE_HOME && model.focus == 4 && model.notice == COFFEE_NOTICE_FAILED);
+        assert_unchanged();
+        /* NVS can already contain the write after commit failure; only RAM stays unchanged. */
+        assert(!store.ready && fake.set_calls == 1 && fake.commit_calls == stage && fake.erase_calls == 0);
+    }
+}
+static void legacy_reserved_preferences_load_defaults(void)
+{
+    reset(); seed_blob();
+    fake.blob[14] = fake.blob[15] = 0; update_crc();
+    saved.home_period = COFFEE_TODAY; saved.theme = 0;
+    coffee_store_t store = {0};
+    assert(coffee_store_init(&store, &data) == ESP_OK);
+    assert_data_equal(&data, &saved); assert_no_writes();
+}
+static void invalid_preferences_have_no_writes(void)
+{
+    reset(); coffee_store_t store = {0};
+    assert(coffee_store_init(&store, &data) == ESP_OK);
+    populate(); data.home_period = COFFEE_PERIOD_COUNT;
+    assert(coffee_store_save(&store, &data) == ESP_ERR_INVALID_ARG);
+    assert(store.ready); assert_no_writes();
+    data.home_period = COFFEE_MONTH; data.theme = COFFEE_THEME_COUNT;
+    assert(coffee_store_save(&store, &data) == ESP_ERR_INVALID_ARG);
+    assert(store.ready); assert_no_writes();
+}
 static void invalid_arguments_are_rejected(void)
 {
     reset(); coffee_store_t store = {0};
@@ -273,6 +340,10 @@ int main(int argc, char **argv)
         {"init_failure", init_failure_never_erases}, {"read_failure", open_and_read_failures_preserve_data},
         {"read_length", inconsistent_read_length_is_rejected}, {"set_failure", set_failure_blocks_retry_without_commit},
         {"commit_failure", commit_failure_blocks_retry_even_if_written}, {"invalid_model", invalid_model_has_no_writes},
+        {"preferences", preferences_roundtrip_preserves_records},
+        {"preferences_failure", preferences_failure_keeps_durable_state},
+        {"legacy", legacy_reserved_preferences_load_defaults},
+        {"invalid_preferences", invalid_preferences_have_no_writes},
         {"arguments", invalid_arguments_are_rejected}
     };
     for (unsigned i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {

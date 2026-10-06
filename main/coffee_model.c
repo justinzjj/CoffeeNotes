@@ -45,6 +45,37 @@ unsigned coffee_weekday(uint32_t date)
     for (unsigned month = 1; month < mo; ++month) days += coffee_month_days(y, month);
     return days % 7;
 }
+uint32_t coffee_week_start(uint32_t date)
+{
+    if (!coffee_date_valid(date)) return 0;
+    return coffee_date_step(date, -(int)coffee_weekday(date));
+}
+uint32_t coffee_week_end(uint32_t date)
+{
+    if (!coffee_date_valid(date)) return 0;
+    /* Derive from the original date: a clipped Monday would shift Sunday's bound. */
+    return coffee_date_step(date, 6 - (int)coffee_weekday(date));
+}
+unsigned coffee_week_count(const coffee_data_t *data, uint32_t date)
+{
+    if (!coffee_date_valid(date)) return 0;
+    uint32_t start = coffee_week_start(date), end = coffee_week_end(date);
+    unsigned count = 0;
+    for (unsigned i = 0; i < data->count; ++i) {
+        if (data->entries[i].date >= start && data->entries[i].date <= end) ++count;
+    }
+    return count;
+}
+unsigned coffee_period_count(const coffee_data_t *data, uint32_t date, coffee_period_t period)
+{
+    if (!coffee_date_valid(date)) return 0;
+    switch (period) {
+    case COFFEE_TODAY: return coffee_day_count(data, date);
+    case COFFEE_WEEK: return coffee_week_count(data, date);
+    case COFFEE_MONTH: return coffee_month_count(data, date);
+    default: return 0;
+    }
+}
 unsigned coffee_day_count(const coffee_data_t *data, uint32_t date)
 {
     unsigned count = 0;
@@ -86,6 +117,7 @@ void coffee_model_init(coffee_model_t *m, coffee_data_t *data)
     m->cursor = m->now_date = m->draft_date = data->last_date;
     m->now_minute = m->draft_minute = data->last_minute;
     m->recipe = COFFEE_NO_RECIPE;
+    m->draft_period = data->home_period; m->draft_theme = data->theme;
 }
 void coffee_model_clock(coffee_model_t *m, uint32_t date, unsigned minute, bool synced)
 {
@@ -186,19 +218,25 @@ coffee_action_t coffee_model_key(coffee_model_t *m, coffee_key_t key, uint64_t n
             }
             break;
         case COFFEE_NETWORK: m->page = COFFEE_SETTINGS; m->focus = 0; return COFFEE_ACTION_CANCEL_SETUP;
-        case COFFEE_FORGET: m->page = COFFEE_SETTINGS; m->focus = 2; break;
+        case COFFEE_FORGET: m->page = COFFEE_SETTINGS; m->focus = 3; break;
+        case COFFEE_THEMES: m->page = COFFEE_SETTINGS; m->focus = 2; break;
         default: m->page = COFFEE_HOME; m->focus = 0; break;
         }
         return COFFEE_ACTION_NONE;
     }
     switch (m->page) {
     case COFFEE_HOME:
-        if (move) m->focus = (uint16_t)cycle(m->focus, 4, delta);
+        if (move) m->focus = (uint16_t)cycle(m->focus, 5, delta);
         if (key == COFFEE_OK) {
             if (m->focus == 0) record_begin(m, m->now_date, false);
             else if (m->focus == 1) { m->page = COFFEE_CALENDAR; m->cursor = m->now_date; }
             else if (m->focus == 2) { m->page = COFFEE_RECIPES; m->focus = 0; }
-            else { m->page = COFFEE_SETTINGS; m->focus = 0; }
+            else if (m->focus == 3) { m->page = COFFEE_SETTINGS; m->focus = 0; }
+            else if (m->focus == 4) {
+                m->draft_period = (uint8_t)cycle(m->data->home_period, COFFEE_PERIOD_COUNT, 1);
+                m->draft_theme = m->data->theme;
+                return COFFEE_ACTION_PREFERENCES;
+            }
         }
         break;
     case COFFEE_CALENDAR:
@@ -250,12 +288,20 @@ coffee_action_t coffee_model_key(coffee_model_t *m, coffee_key_t key, uint64_t n
         }
         break;
     case COFFEE_SETTINGS:
-        if (move) m->focus = (uint16_t)cycle(m->focus, 3, delta);
+        if (move) m->focus = (uint16_t)cycle(m->focus, 4, delta);
         if (key == COFFEE_OK) {
             if (m->focus == 0) { m->page = COFFEE_NETWORK; return COFFEE_ACTION_SETUP; }
             if (m->focus == 1) date_begin(m, COFFEE_SETTINGS, true);
-            if (m->focus == 2) { m->page = COFFEE_FORGET; m->focus = 0; }
+            if (m->focus == 2) {
+                m->page = COFFEE_THEMES;
+                m->draft_theme = m->data->theme; m->draft_period = m->data->home_period;
+            }
+            if (m->focus == 3) { m->page = COFFEE_FORGET; m->focus = 0; }
         }
+        break;
+    case COFFEE_THEMES:
+        if (move) m->draft_theme = (uint8_t)cycle(m->draft_theme, COFFEE_THEME_COUNT, delta);
+        if (key == COFFEE_OK) return COFFEE_ACTION_PREFERENCES;
         break;
     case COFFEE_NETWORK: if (key == COFFEE_OK) return COFFEE_ACTION_SETUP; break;
     case COFFEE_DATE:
@@ -275,7 +321,7 @@ coffee_action_t coffee_model_key(coffee_model_t *m, coffee_key_t key, uint64_t n
         if (move) m->focus = (uint16_t)cycle(m->focus, 2, delta);
         if (key == COFFEE_OK) {
             bool confirmed = m->focus == 1;
-            m->page = COFFEE_SETTINGS; m->focus = 2;
+            m->page = COFFEE_SETTINGS; m->focus = 3;
             if (confirmed) return COFFEE_ACTION_FORGET;
         }
         /* Keep cancellation selected by default. */
@@ -290,7 +336,8 @@ static bool entry_valid(const coffee_entry_t *e)
 }
 static bool data_valid(const coffee_data_t *d)
 {
-    if (d->count > COFFEE_CAPACITY || !coffee_date_valid(d->last_date) || d->last_minute >= 1440) return false;
+    if (d->count > COFFEE_CAPACITY || !coffee_date_valid(d->last_date) || d->last_minute >= 1440 ||
+        d->home_period >= COFFEE_PERIOD_COUNT || d->theme >= COFFEE_THEME_COUNT) return false;
     for (unsigned i = 0; i < COFFEE_RECIPE_COUNT; ++i) if (!coffee_recipe_valid(&d->recipes[i])) return false;
     for (unsigned i = 0; i < d->count; ++i) if (!entry_valid(&d->entries[i])) return false;
     return true;
@@ -315,6 +362,9 @@ bool coffee_prepare_change(const coffee_model_t *m, coffee_action_t action, coff
         c->recipes[m->recipe] = m->draft_recipe; break;
     case COFFEE_ACTION_CLOCK:
         c->last_date = m->draft_date; c->last_minute = m->draft_minute; break;
+    case COFFEE_ACTION_PREFERENCES:
+        if (m->draft_period >= COFFEE_PERIOD_COUNT || m->draft_theme >= COFFEE_THEME_COUNT) return false;
+        c->home_period = m->draft_period; c->theme = m->draft_theme; break;
     default: return false;
     }
     return data_valid(c);
@@ -326,6 +376,9 @@ void coffee_model_complete(coffee_model_t *m, coffee_action_t action, bool succe
     if (action == COFFEE_ACTION_RECORD) { m->page = COFFEE_HOME; m->focus = 0; }
     if (action == COFFEE_ACTION_DELETE) { m->page = COFFEE_DAY; m->day_focus = 0; }
     if (action == COFFEE_ACTION_RECIPE) { m->page = COFFEE_RECIPE; m->focus = 0; m->editing = false; }
+    if (action == COFFEE_ACTION_PREFERENCES && m->page == COFFEE_THEMES) {
+        m->page = COFFEE_SETTINGS; m->focus = 2;
+    }
     if (action == COFFEE_ACTION_CLOCK) {
         m->now_date = m->cursor = m->draft_date; m->now_minute = m->draft_minute;
         m->clock_valid = true; m->clock_manual = true; m->page = m->date_return;
@@ -354,6 +407,7 @@ size_t coffee_encode(const coffee_data_t *d, uint8_t *out, size_t capacity)
     if (!data_valid(d) || capacity < n) return 0;
     memset(out, 0, n); memcpy(out, "CFN1", 4); out[4] = 1;
     put16(out + 6, d->count); put32(out + 8, d->last_date); put16(out + 12, d->last_minute);
+    out[14] = d->home_period; out[15] = d->theme;
     for (unsigned i = 0; i < COFFEE_RECIPE_COUNT; ++i) {
         uint8_t *p = out + 16 + i * 8; const coffee_recipe_t *r = &d->recipes[i];
         put16(p, r->grams); put16(p + 2, r->water_ml); put16(p + 4, r->degrees); put16(p + 6, r->seconds);
@@ -371,11 +425,13 @@ bool coffee_decode(coffee_data_t *d, const uint8_t *input, size_t n)
     if (n < 48 || n > COFFEE_WIRE_MAX || memcmp(input, "CFN1", 4) || input[4] != 1) return false;
     unsigned count = get16(input + 6);
     if (count > COFFEE_CAPACITY || n != 48 + count * 12 || get32(input + 44) != checksum(input, n) ||
-        !coffee_date_valid(get32(input + 8)) || get16(input + 12) >= 1440) return false;
+        !coffee_date_valid(get32(input + 8)) || get16(input + 12) >= 1440 ||
+        input[14] >= COFFEE_PERIOD_COUNT || input[15] >= COFFEE_THEME_COUNT) return false;
     for (unsigned i = 0; i < COFFEE_RECIPE_COUNT; ++i) { coffee_recipe_t r = read_recipe(input + 16 + i * 8); if (!coffee_recipe_valid(&r)) return false; }
     for (unsigned i = 0; i < count; ++i) { coffee_entry_t e = read_entry(input + 48 + i * 12); if (!entry_valid(&e)) return false; }
     /* Validate fully before modifying the caller's durable state. */
     memset(d, 0, sizeof(*d)); d->count = (uint16_t)count; d->last_date = get32(input + 8); d->last_minute = get16(input + 12);
+    d->home_period = input[14]; d->theme = input[15];
     for (unsigned i = 0; i < COFFEE_RECIPE_COUNT; ++i) d->recipes[i] = read_recipe(input + 16 + i * 8);
     for (unsigned i = 0; i < count; ++i) d->entries[i] = read_entry(input + 48 + i * 12);
     return true;

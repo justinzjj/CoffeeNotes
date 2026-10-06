@@ -82,7 +82,7 @@ static bool perform(coffee_action_t action)
 static void worker(void *arg)
 {
     (void)arg;
-    bool dirty = true, dimmed = false;
+    bool dirty = true, screen_off = false;
     int wake_button = -1;
     uint64_t last_input = 0, last_battery = 0, notice_until = 0;
     uint32_t last_second = UINT32_MAX, sync_generation = 0;
@@ -92,10 +92,10 @@ static void worker(void *arg)
         uint64_t now = (uint64_t)esp_timer_get_time() / 1000;
         if (received) {
             last_input = now;
-            if (dimmed) {
-                bsp_display_backlight(85); dimmed = false;
+            if (screen_off) {
+                bsp_display_backlight(85); screen_off = false;
                 if (event.event == BSP_BTN_PRESS) wake_button = (int)event.button;
-                /* Consume the complete first gesture after idle dimming. */
+                /* Consume the complete first gesture after the idle screen turns off. */
                 received = false;
             } else if (wake_button == (int)event.button) {
                 if (event.event != BSP_BTN_PRESS) wake_button = -1;
@@ -136,8 +136,8 @@ static void worker(void *arg)
             uint32_t second = coffee_timer_seconds(&model, now);
             if (second != last_second) { last_second = second; dirty = true; }
         } else last_second = UINT32_MAX;
-        if (!dimmed && now - last_input >= 60000 && !model.timer_active && !net.provisioning) {
-            bsp_display_backlight(15); dimmed = true;
+        if (!screen_off && now - last_input >= 60000 && !model.timer_active && !net.provisioning) {
+            bsp_display_backlight(0); screen_off = true;
         }
         if (dirty && bsp_lvgl_lock(500)) {
             coffee_ui_render(&model, &ui, now);
@@ -147,7 +147,7 @@ static void worker(void *arg)
 }
 void app_main(void)
 {
-    ESP_LOGI(TAG, "CoffeeNotes 1.0.0 starting");
+    ESP_LOGI(TAG, "CoffeeNotes 1.1.0 starting");
     setenv("TZ", "CST-8", 1); tzset();
     /* A build-date draft is never accepted as a real clock on cold boot. */
     coffee_data_init(&data, 20261006);

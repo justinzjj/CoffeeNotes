@@ -30,11 +30,12 @@ CoffeeNotes 使用 `fonts/CoffeeNotesSansSC-Regular.otf` 以及生成的
 
 可复用的源图与生成的显示资产放在 `images/`。
 
-CoffeeNotes 社区图片为 `images/coffeenotes/cover.png`、`calendar.png` 和 `timer.png`
+CoffeeNotes 当前界面图片为 `images/coffeenotes/cover.png`、`calendar.png` 和 `timer.png`
 （240 × 320 PNG，竖版 3:4）。它们使用本项目实际界面与字体，由
 `tests/coffee_preview/preview.c` 中的演示记录完成无窗口渲染，不是实机照片或个人数据。
-取得 PNG 前已确认渲染测试成功完成；社区提交前逐一打开了实际最终文件检查。
-用途为社区封面/配图及双语根目录 README 预览。没有裁剪或缩放。
+取得 PNG 前已确认 1.1 界面渲染测试成功完成，并逐一检查最终文件。
+用途为双语根目录 README 与项目预览，未提交为新版社区图片。首版社区素材保留在 Git 历史。
+没有裁剪或缩放。
 界面作品遵循仓库许可证，字体来源及许可见上方字库章节。
 
 | 文件 | 尺寸与格式 | 用途与来源 |

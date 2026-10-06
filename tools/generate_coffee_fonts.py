@@ -39,6 +39,8 @@ for size in (14,16,20):
     subprocess.run([args.converter, '--font', str(font_path), '--range', '0x20-0x7E', '--symbols', symbols,
                     '--size', str(size), '--bpp', '4', '--format', 'lvgl', '--no-compress', '--lv-include', 'lvgl.h',
                     '--lv-font-name', f'coffee_font_{size}', '--output', str(output / f'coffee_font_{size}.c')], check=True)
+    generated = output / f'coffee_font_{size}.c'
+    generated.write_text(generated.read_text().rstrip() + '\n')
 (output / 'coffee_font_manifest.json').write_text(json.dumps({'family':'CoffeeNotes Sans SC (Noto Sans CJK SC subset)',
     'converter':'lv_font_conv 1.5.3', 'glyphs':len(points), 'sizes':[14,16,20], 'bpp':4, 'compressed':False,
     'otf_sha256':hashlib.sha256(font_path.read_bytes()).hexdigest()},indent=2) + '\n')

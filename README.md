@@ -14,7 +14,9 @@ not device photographs or personal coffee history.
 ## Start using it
 
 1. Use Up/Down to select, OK to open, and hold OK to go back or cancel.
-2. Open **Date & Network → Configure Wi-Fi** and press OK.
+   From the home Record a Cup row, press Up to select statistics; OK cycles today,
+   this week and this month. Weeks run Monday through Sunday.
+2. Open **Settings → Configure Wi-Fi** and press OK.
    On your phone, join the displayed **CoffeeNotes-xxxx** hotspot with its displayed
    password; stay connected even if the phone reports no internet. Open
    **http://192.168.4.1**, enter your **2.4 GHz Wi-Fi** name and password, and tap
@@ -24,15 +26,21 @@ not device photographs or personal coffee history.
 3. Open **Record a Cup**, choose a coffee type, and press OK to save.
    Select a date in **Coffee Calendar** and press OK to view its entries.
    Recording works offline; after power-off without a time sync, confirm the date
-   in **Date & Network → Adjust Date Manually**.
+   in **Settings → Adjust Date Manually**.
 4. In **Brew Handbook**, choose a recipe, adjust its parameters or start
    the timer. OK pauses/resumes; Up finishes, then OK saves the entry. Hold OK to
    cancel. Records survive power-off, and saved Wi-Fi reconnects at startup.
 
+5. **Settings → Palette** offers coffee brown, matcha green, sea-salt blue and
+   midnight dark. Up/Down previews, OK saves, and holding OK cancels. Statistics
+   scope and palette persist with the journal. Calendar shades indicate 0, 1, 2 or
+   3+ cups; the selected date retains its shade with an outline.
+
 The device UI is in Simplified Chinese. Six coffee types, three editable recipe
 starting points, and up to 512 records are supported. There is no bean-name keyboard,
 cloud account or audible timer alarm. A full record store requires explicit deletion
-before adding more entries.
+before adding more entries. After 60 seconds without input the screen turns off; brewing
+(including pause) and Wi-Fi setup stay lit. The first button gesture only wakes the screen.
 
 ## Build and firmware
 
@@ -50,22 +58,26 @@ at **0x0**, and matching ELF/MAP artifacts under `build/firmware/<sha256>/`.
 Flashing the merged image may reset existing records and Wi-Fi settings.
 The app-only binary must not be flashed at 0x0.
 
-The tested initial image has SHA-256
-`d546e9552f3cc3f3f052d0512f75602871b9833c3af28a5e2eadfb5ab8a8a7ef`.
-Its embedded build version is `33d3d1d-dirty`; use the hash-bound ELF for diagnosis.
+The tested version-1.1 image has SHA-256
+`f3b1c4b233243175402702dd31af683aa58bd37a39994891590b111c855be428`.
+Its embedded build version is `ccad39b-dirty`; use the hash-bound ELF for diagnosis.
+This is the exact image accepted during device testing; the later source commit does not alter it.
 Binary/debug artifacts and local publisher credentials are excluded from Git.
 
 ## Validation and documentation
 
 - Build: **PASS**, complete ESP-IDF gate and merged-image/archive checks.
 - Host tests: **PASS**, model/form/storage/network fault tests and actual UI/font rendering.
-- Device tests: **Core flows PASS**, startup, phone provisioning, correct date/time,
-  record retention after power-off, and automatic network/time recovery confirmed.
-- Unverified: full visual/control acceptance, timer behavior, deletion and recipe
-  persistence, idle dimming/wake behavior, and sustained network memory margins.
+- Device tests: **Observed checks PASS**: verified segmented flash/startup, plus
+  user-confirmed idle screen-off/wake, lit display during running/paused brewing, readable
+  palette previews, period switching and palette/period retention after power-off.
+  Initial-release network/record observations remain in the historical test record.
+- Unverified: all-page visual/control acceptance, populated-device calendar intensity,
+  timer record saving, deletion/recipe persistence and sustained network memory.
 
 See the [user guide and test record](docs/apps/coffeenotes.md),
-[implementation plan](docs/superpowers/plans/2026-10-06-coffeenotes.md), and
+[implementation plan](docs/superpowers/plans/2026-10-06-coffeenotes.md),
+[UI refinement plan](docs/superpowers/plans/2026-10-06-coffeenotes-ui.md), and
 [upstream documentation index](docs/README.md).
 
 Code is covered by the repository's [MIT license](LICENSE).

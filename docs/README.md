@@ -36,7 +36,9 @@ it anything—from a pocket companion to something no one has imagined yet.
 
 This checkout implements [CoffeeNotes](apps/coffeenotes.md): a Chinese coffee
 calendar, quick cup journal and editable pour-over handbook/timer with Wi-Fi
-Beijing time and local persistence. See the [implementation plan](superpowers/plans/2026-10-06-coffeenotes.md).
+Beijing time and local persistence. Intensity calendars, day/week/month counts and four palettes
+are documented in the [implementation plan](superpowers/plans/2026-10-06-coffeenotes.md)
+and [UI refinement plan](superpowers/plans/2026-10-06-coffeenotes-ui.md).
 
 <p align="center">
   <img src="../assets/images/home.jpg" alt="FoloToy AI Passport wearable device shown from the front, side, and back." width="100%">
