@@ -38,8 +38,8 @@ and `timer.png` (240 × 320 PNG, portrait 3:4). They are completed headless rend
 of this project's actual UI and fonts, using synthetic records from
 `tests/coffee_preview/preview.c`; they are not device photographs or personal data.
 The version-1.1 rendering test completed successfully before PNG conversion; the exact
-final files were visually inspected. They illustrate the bilingual README and project previews,
-and have not been submitted as a community revision. Initial community assets remain in Git history.
+final files were visually inspected. They illustrate the bilingual README and version-1.1
+community cover/gallery previews. Initial community assets remain in Git history.
 No image crop or resize was applied. Interface artwork is covered by the repository license;
 font attribution remains in the Fonts section above.
 
