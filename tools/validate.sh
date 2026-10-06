@@ -11,6 +11,10 @@ usage() {
 run_static_checks() {
     local actionlint_bin
     local test_dir
+    local gc_sections="-Wl,--gc-sections"
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        gc_sections="-Wl,-dead_strip"
+    fi
 
     python3 tools/check_repo.py
 
@@ -32,6 +36,18 @@ run_static_checks() {
         tests/test_demo_navigation.c main/demo_navigation.c \
         -o "${test_dir}/test_demo_navigation"
     "${test_dir}/test_demo_navigation"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
+        tests/test_coffee_model.c main/coffee_model.c -o "${test_dir}/test_coffee_model"
+    "${test_dir}/test_coffee_model"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
+        tests/test_coffee_form.c main/coffee_form.c -o "${test_dir}/test_coffee_form"
+    "${test_dir}/test_coffee_form"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Itests/coffee_store_stubs -Imain \
+        tests/test_coffee_store.c main/coffee_store.c main/coffee_model.c \
+        -o "${test_dir}/test_coffee_store"
+    "${test_dir}/test_coffee_store"
+    PYTHONDONTWRITEBYTECODE=1 python3 tests/test_coffee_assets.py
+    PYTHONDONTWRITEBYTECODE=1 python3 tests/coffee_network_stubs/run_tests.py
     "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Icomponents/bsp/src \
         tests/test_bsp_display_rounding.c components/bsp/src/bsp_display_rounding.c \
         -o "${test_dir}/test_bsp_display_rounding"
@@ -57,7 +73,7 @@ run_static_checks() {
     for demo in audio low_power ble wifi; do
         "${CC:-cc}" -std=c11 -Wall -Wextra -Werror \
             -ffunction-sections -fdata-sections -Itests/demo_stubs -Imain \
-            "tests/test_demo_${demo}_runtime.c" -Wl,--gc-sections \
+            "tests/test_demo_${demo}_runtime.c" "${gc_sections}" \
             -o "${test_dir}/test_demo_${demo}_runtime"
         "${test_dir}/test_demo_${demo}_runtime"
     done
@@ -97,10 +113,17 @@ run_firmware_checks() (
 )
 
 cd "${repo_root}"
+run_coffee_preview_checks() {
+    cmake -S tests/coffee_preview -B build/coffee-preview -G Ninja
+    cmake --build build/coffee-preview --parallel 4
+    (cd build/coffee-preview && ./coffee_preview)
+}
+
 case "${mode}" in
     --all)
         run_static_checks
         run_firmware_checks
+        run_coffee_preview_checks
         ;;
     --static)
         run_static_checks

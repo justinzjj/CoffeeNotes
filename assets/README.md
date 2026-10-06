@@ -12,6 +12,18 @@ Keep each asset in the matching subdirectory and document its destination, namin
 
 Store reusable font files and generated font sources in `fonts/`.
 
+CoffeeNotes uses `fonts/CoffeeNotesSansSC-Regular.otf` and generated
+`fonts/coffee_font_14.c`, `coffee_font_16.c`, `coffee_font_20.c`.
+The renamed subset derives from [Noto Sans CJK SC Regular 2.004](https://github.com/notofonts/noto-cjk/tree/Sans2.004),
+copyright Adobe 2014-2021, licensed under the [SIL Open Font License](fonts/OFL.txt).
+`coffee_glyphs.txt`/`.h` and `coffee_font_manifest.json` retain the inventory and
+font hash. Generate with `python3 tools/generate_coffee_fonts.py --source-font <licensed-full-font.otf> --converter <lv_font_conv>`
+using `fonttools` and `lv_font_conv 1.5.3`; the default source is the retained subset.
+All three sizes include ASCII and every fixed UI character at 4 bpp, uncompressed,
+linked by the main component. UI render tests verify actual fonts and a known-missing
+character. This fixed subset does not support arbitrary bean names or router SSIDs;
+the device only displays its ASCII setup-hotspot name, while the phone uses browser fonts.
+
 - Use descriptive names that include the family, weight, size, and format when relevant.
 - Document the source, license, character range, conversion command, and expected destination.
 - Check Flash and internal-RAM impact before adding a font; the ESP32-C3 has no PSRAM.
@@ -20,6 +32,16 @@ Store reusable font files and generated font sources in `fonts/`.
 ## Images
 
 Store reusable source images and generated display assets in `images/`.
+
+CoffeeNotes community images are `images/coffeenotes/cover.png`, `calendar.png`,
+and `timer.png` (240 × 320 PNG, portrait 3:4). They are completed headless renders
+of this project's actual UI and fonts, using synthetic records from
+`tests/coffee_preview/preview.c`; they are not device photographs or personal data.
+The rendering test completed successfully before the PNGs were obtained; the exact
+final files were visually inspected before community submission. They are used as
+the community cover/gallery and the bilingual root README preview. No image crop
+or resize was applied. Interface artwork is covered by the repository license;
+font attribution remains in the Fonts section above.
 
 | File | Dimensions and format | Use and source |
 | --- | --- | --- |

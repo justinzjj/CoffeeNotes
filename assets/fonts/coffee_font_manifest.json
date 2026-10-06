@@ -1,0 +1,13 @@
+{
+  "family": "CoffeeNotes Sans SC (Noto Sans CJK SC subset)",
+  "converter": "lv_font_conv 1.5.3",
+  "glyphs": 321,
+  "sizes": [
+    14,
+    16,
+    20
+  ],
+  "bpp": 4,
+  "compressed": false,
+  "otf_sha256": "9c78a1bdc961cb180494fdcebecf2ff9951d96a9d1a2191bc964722a3f54d3ac"
+}

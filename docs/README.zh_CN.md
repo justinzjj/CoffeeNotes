@@ -33,6 +33,10 @@
 **FoloToy AI Passport** 是开放的可穿戴 AI 平台，人人都可以动手改造、自由创作。
 从一个简单想法开始，打造专属体验——无论是随身伙伴、小工具、游戏，还是任何新点子。
 
+当前工作区实现 [CoffeeNotes 咖啡手记](apps/coffeenotes.zh_CN.md)：中文咖啡日历、快速饮用
+记录和可调整的手冲参数与计时，支持联网同步北京时间和本地存储。
+参见[实现计划](superpowers/plans/2026-10-06-coffeenotes.zh_CN.md)。
+
 <p align="center">
   <img src="../assets/images/home.jpg" alt="FoloToy AI Passport 可穿戴设备的正面、侧面和背面展示。" width="100%">
 </p>

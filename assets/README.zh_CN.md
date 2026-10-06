@@ -10,6 +10,17 @@
 
 可复用的字库文件与生成的字库源码放在 `fonts/`。
 
+CoffeeNotes 使用 `fonts/CoffeeNotesSansSC-Regular.otf` 以及生成的
+`fonts/coffee_font_14.c`、`coffee_font_16.c`、`coffee_font_20.c`。
+重命名子集来自 [Noto Sans CJK SC Regular 2.004](https://github.com/notofonts/noto-cjk/tree/Sans2.004)，
+版权 Adobe 2014-2021，采用 [SIL Open Font License](fonts/OFL.txt)。
+`coffee_glyphs.txt`/`.h` 与 `coffee_font_manifest.json` 保留字符清单及字体哈希。
+使用 `fonttools` 与固定的 `lv_font_conv 1.5.3`，运行
+`python3 tools/generate_coffee_fonts.py --source-font <licensed-full-font.otf> --converter <lv_font_conv>`；
+默认输入为保留的字体子集。三个尺寸均覆盖 ASCII 与全部固定界面文本，4 bpp、不压缩，
+由 main 组件编译链接；渲染测试检查实际字体及已知缺字反例。该固定子集不支持任意豆名或
+路由器 SSID，设备只展示 ASCII 配网热点名，手机网页使用浏览器字体。
+
 - 命名要能反映字族、字重、字级与格式。
 - 记录来源、许可、字符范围、转换命令与目标放置路径。
 - 添加字库前评估 Flash 与内部 RAM 影响；ESP32-C3 无 PSRAM。
@@ -18,6 +29,13 @@
 ## 图片（images）
 
 可复用的源图与生成的显示资产放在 `images/`。
+
+CoffeeNotes 社区图片为 `images/coffeenotes/cover.png`、`calendar.png` 和 `timer.png`
+（240 × 320 PNG，竖版 3:4）。它们使用本项目实际界面与字体，由
+`tests/coffee_preview/preview.c` 中的演示记录完成无窗口渲染，不是实机照片或个人数据。
+取得 PNG 前已确认渲染测试成功完成；社区提交前逐一打开了实际最终文件检查。
+用途为社区封面/配图及双语根目录 README 预览。没有裁剪或缩放。
+界面作品遵循仓库许可证，字体来源及许可见上方字库章节。
 
 | 文件 | 尺寸与格式 | 用途与来源 |
 | --- | --- | --- |
